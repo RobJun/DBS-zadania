@@ -9,6 +9,7 @@ import os
 
 @api_view(['GET'])
 def getData(request):
+    
     conn = psycopg2.connect(
         database=os.getenv("DBNAME"),
         user= os.getenv('DBUSER'),
@@ -16,6 +17,7 @@ def getData(request):
         host=os.getenv('DBHOST'),
         port=os.getenv("DBPORT")
     )
+    print(conn)
     cursor = conn.cursor()
     raw_query = "SELECT VERSION();"
     cursor.execute(raw_query)

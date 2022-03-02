@@ -131,3 +131,5 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     )
 }
+
+ALLOWED_HOSTS = [ '161.35.67.104']
