@@ -1,2 +1,3 @@
-
 dbsprojekt/
+__pycache__/
+*.py[cod]
