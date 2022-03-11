@@ -51,19 +51,19 @@ def getPatches(request):
     )
     cursor = conn.cursor()
     raw_query = '''SELECT 
-	                name as patch_version,
-	                patch_start_date,
-	                patch_end_date,
-	                matches.id as match_id,
-	                ROUND((matches.duration::numeric / 60),2)::float as match_duration
-                    FROM (
-		                SELECT name,
-			            cast(extract(epoch from release_date) as integer) as patch_start_date,
-                        cast(extract(epoch from LEAD(release_date,1) OVER (ORDER BY name)) as integer) as patch_end_date
-                        FROM patches
-	                ) as myquery 
-                    Inner JOIN matches ON matches.start_time BETWEEN patch_start_date AND patch_end_date
-                    ORDER BY name;'''
+name as patch_version,
+patch_start_date::float,
+patch_end_date::float,
+matches.id as match_id,
+ROUND((matches.duration::numeric / 60),2)::float as match_duration
+FROM (
+	SELECT name,
+	cast(extract(epoch from release_date) as integer) as patch_start_date,
+    cast(extract(epoch from LEAD(release_date,1) OVER (ORDER BY name)) as integer) as patch_end_date
+    FROM patches
+	) as myquery 
+INNER JOIN matches ON matches.start_time BETWEEN patch_start_date AND patch_end_date
+ORDER BY name,match_id;'''
     cursor.execute(raw_query)
     patches = []
     current_patch = ""
@@ -97,10 +97,11 @@ def getGame_exp(request,id):
     matches.radiant_win = (matches_players_details.player_slot BETWEEN 0 and 4) as winner,
     match_id
     FROM players
-    LEFT JOIN matches_players_details ON players.id = player_id
+    LEFT JOIN matches_players_details ON players.id = player_id 
     LEFT JOIN heroes ON heroes.id = hero_id
     LEFT JOIN matches ON match_id = matches.id
-    WHERE players.id =   {:};'''.format(id)
+    WHERE players.id =   {:}
+	ORDER BY match_id;'''.format(id)
     cursor.execute(raw_query)
     rows = cursor.fetchall()
     if rows == []:  return Response({})
@@ -126,7 +127,7 @@ def getObjectives(request, id):
     )
     cursor = conn.cursor()
     raw_query = '''SELECT players.id,COALESCE(nick,'unknown') as player_nick,localized_name as hero_localized_name,
-	match_id,COALESCE(subtype,'NO_ACTION'), COUNT(subtype)
+	match_id,COALESCE(subtype,'NO_ACTION'), COUNT(COALESCE(subtype,'NO_ACTION'))
     FROM players
    	LEFT JOIN matches_players_details ON players.id = player_id
     LEFT JOIN heroes ON heroes.id = hero_id
