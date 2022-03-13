@@ -1,6 +1,5 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-from matplotlib import patches
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view,renderer_classes
@@ -10,8 +9,10 @@ import psycopg2
 import os
 import json
 import re
+from api_v2.models import Patches, PatchesSerializer
 
 from api_v2.renderers import decimalJSONRenderer
+from api_v2.serializers import serializeAbilities, serializeObjectives, serializePatches, serializePlayerExp
 
 
 
@@ -46,17 +47,20 @@ INNER JOIN heroes ON heroes.id = hero_id
 INNER JOIN matches ON match_id = matches.id
 '''
 
+
+conn = psycopg2.connect(
+    database=os.getenv("DBNAME"),
+    user= os.getenv('DBUSER'),
+    password=os.getenv('DBPASS'),
+    host=os.getenv('DBHOST'),
+    port=os.getenv("DBPORT")
+)
+cursor = conn.cursor()
+
 @api_view(['GET'])
 @renderer_classes([decimalJSONRenderer,])
 def getPatches(request):
 
-    conn = psycopg2.connect(
-        database=os.getenv("DBNAME"),
-        user= os.getenv('DBUSER'),
-        password=os.getenv('DBPASS'),
-        host=os.getenv('DBHOST'),
-        port=os.getenv("DBPORT")
-    )
     cursor = conn.cursor()
     raw_query = '''SELECT 
     name as patch_version,
@@ -73,31 +77,11 @@ FROM (
 INNER JOIN matches ON matches.start_time BETWEEN patch_start_date AND patch_end_date
 ORDER BY name,match_id;'''
     cursor.execute(raw_query)
-
-    # wish i could use :(( but json encoder converts 3.80 to 3.8
-    patches = []
-    current_patch = ""
-    for row in cursor.fetchall():
-        if current_patch != row[0]:
-            patches.append({"patch_version": row[0],"patch_start_date": float(row[1]), "patch_end_date": float(row[2]), "matches" : []})
-            current_patch = row[0]
-        if(row[3] == None and row[4] == None):
-           continue
-        patches[-1]["matches"].append({"match_id" : row[3], "duration" : row[4]})
-    return Response({"patches":  patches})  
-    #return HttpResponse(jsonString,content_type='application/json')
+    #return PatchesSerializer(Patches(cursor.fetchall())).data # really slow
+    return Response(serializePatches(cursor.fetchall()))  
 
 @api_view(['GET'])
 def getGame_exp(request,id):
-
-    conn = psycopg2.connect(
-        database=os.getenv("DBNAME"),
-        user= os.getenv('DBUSER'),
-        password=os.getenv('DBPASS'),
-        host=os.getenv('DBHOST'),
-        port=os.getenv("DBPORT")
-    )
-    cursor = conn.cursor()
     raw_query = '''SELECT players.id,COALESCE(nick,'unknown') as player_nick,
     localized_name as hero_localized_name,
     ROUND((matches.duration::numeric / 60),2)::float as match_duration_minutes,
@@ -112,29 +96,10 @@ def getGame_exp(request,id):
     WHERE players.id =   {:}
 	ORDER BY match_id;'''.format(id)
     cursor.execute(raw_query)
-    rows = cursor.fetchall()
-    if rows == []:  return Response({})
-    player_details = {"id" : rows[0][0], "player_nick" : rows[0][1], "matches" : []}
-    for row in rows:
-        player_details["matches"].append({"match_id": row[7],
-                                        "hero_localized_name": row[2],
-                                        "match_duration_minutes": row[3],
-                                        "experiences_gained": row[4],
-                                        "level_gained": row[5],
-                                        "winner": row[6]})
-        
-    return Response(player_details)
+    return Response(serializePlayerExp(cursor.fetchall()))
 
 @api_view(['GET'])
 def getObjectives(request, id):
-    conn = psycopg2.connect(
-        database=os.getenv("DBNAME"),
-        user= os.getenv('DBUSER'),
-        password=os.getenv('DBPASS'),
-        host=os.getenv('DBHOST'),
-        port=os.getenv("DBPORT")
-    )
-    cursor = conn.cursor()
     raw_query = '''SELECT players.id,COALESCE(nick,'unknown') as player_nick,localized_name as hero_localized_name,
 	match_id,COALESCE(subtype,'NO_ACTION'), COUNT(COALESCE(subtype,'NO_ACTION'))
     FROM players
@@ -146,28 +111,11 @@ def getObjectives(request, id):
 	match_id,subtype
 	ORDER BY match_id,localized_name;'''.format(id)
     cursor.execute(raw_query)
-    rows = cursor.fetchall()
-    if rows == []:  return Response({})
-    current_match = None
-    player_details = {"id" : rows[0][0], "player_nick" : rows[0][1], "matches" : []}
-    for row in rows:
-        if current_match != (row[3],row[2]):
-            player_details["matches"].append({"match_id": row[3], "hero_localized_name": row[2], "actions": []})
-            current_match = (row[3],row[2])
-        player_details["matches"][-1]["actions"].append({"hero_action": row[4],"count": row[5]})
-    return Response(player_details)
+    return Response(serializeObjectives(cursor.fetchall()))
 
 
 @api_view(['GET'])
 def getAbilities(request, id):
-    conn = psycopg2.connect(
-        database=os.getenv("DBNAME"),
-        user= os.getenv('DBUSER'),
-        password=os.getenv('DBPASS'),
-        host=os.getenv('DBHOST'),
-        port=os.getenv("DBPORT")
-    )
-    cursor = conn.cursor()
     raw_query ='''SELECT players.id, 
 COALESCE(nick,'unknown') as player_nick,
 localized_name as hero_localized_name,
@@ -186,13 +134,4 @@ localized_name,
 match_id, abilities.name
 ORDER BY match_id, abilities.name'''.format(id)
     cursor.execute(raw_query)
-    rows = cursor.fetchall()
-    if rows == []:  return Response({})
-    current_match = None
-    player_details = {"id" : rows[0][0], "player_nick" : rows[0][1], "matches" : []}
-    for row in rows:
-        if current_match != (row[3],row[2]):
-            player_details["matches"].append({"match_id": row[3], "hero_localized_name": row[2], "abilities": []})
-            current_match = (row[3],row[2])
-        player_details["matches"][-1]["abilities"].append({"ability_name": row[4],"count": row[5],"upgrade_level": row[6]})
-    return Response(player_details)
+    return Response(serializeAbilities(cursor.fetchall()))

@@ -1,4 +1,4 @@
-
+#Decimal places: 35.30 will be 35.30 and not 35.3
 
 from rest_framework.renderers import JSONRenderer
 from decimal import Decimal
