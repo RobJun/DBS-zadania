@@ -47,21 +47,21 @@ INNER JOIN heroes ON heroes.id = hero_id
 INNER JOIN matches ON match_id = matches.id
 '''
 
+def connect():
+    return psycopg2.connect(
+        database=os.getenv("DBNAME"),
+        user= os.getenv('DBUSER'),
+        password=os.getenv('DBPASS'),
+        host=os.getenv('DBHOST'),
+        port=os.getenv("DBPORT")
+    )
 
-conn = psycopg2.connect(
-    database=os.getenv("DBNAME"),
-    user= os.getenv('DBUSER'),
-    password=os.getenv('DBPASS'),
-    host=os.getenv('DBHOST'),
-    port=os.getenv("DBPORT")
-)
-cursor = conn.cursor()
 
 @api_view(['GET'])
 @renderer_classes([decimalJSONRenderer,])
 def getPatches(request):
 
-    cursor = conn.cursor()
+    cursor = connect().cursor()
     raw_query = '''SELECT 
     name as patch_version,
     patch_start_date,
@@ -82,6 +82,7 @@ ORDER BY name,match_id;'''
 
 @api_view(['GET'])
 def getGame_exp(request,id):
+    cursor = connect().cursor()
     raw_query = '''SELECT players.id,COALESCE(nick,'unknown') as player_nick,
     localized_name as hero_localized_name,
     ROUND((matches.duration::numeric / 60),2)::float as match_duration_minutes,
@@ -100,6 +101,7 @@ def getGame_exp(request,id):
 
 @api_view(['GET'])
 def getObjectives(request, id):
+    cursor = connect().cursor()
     raw_query = '''SELECT players.id,COALESCE(nick,'unknown') as player_nick,localized_name as hero_localized_name,
 	match_id,COALESCE(subtype,'NO_ACTION'), COUNT(COALESCE(subtype,'NO_ACTION'))
     FROM players
@@ -116,6 +118,7 @@ def getObjectives(request, id):
 
 @api_view(['GET'])
 def getAbilities(request, id):
+    cursor = connect().cursor()
     raw_query ='''SELECT players.id, 
 COALESCE(nick,'unknown') as player_nick,
 localized_name as hero_localized_name,
