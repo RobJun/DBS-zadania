@@ -63,19 +63,19 @@ def getPatches(request):
 
     cursor = connect().cursor()
     raw_query = '''SELECT 
-    name as patch_version,
-    patch_start_date,
-patch_end_date,
-matches.id as match_id,
-ROUND((matches.duration::numeric / 60),2) as match_duration
-FROM (
-	SELECT name,
-	cast(extract(epoch from release_date) as integer) as patch_start_date,
-    cast(extract(epoch from LEAD(release_date,1) OVER (ORDER BY name)) as integer) as patch_end_date
-    FROM patches
+	name as patch_version,
+	patch_start_date,
+	patch_end_date,
+	matches.id as match_id,
+	ROUND((matches.duration::numeric / 60),2)::float as match_duration
+    FROM (
+	    SELECT name,
+	    cast(extract(epoch from release_date) as integer) as patch_start_date,
+        cast(extract(epoch from LEAD(release_date,1) OVER (ORDER BY name)) as integer) as patch_end_date
+        FROM patches
 	) as myquery 
-INNER JOIN matches ON matches.start_time BETWEEN patch_start_date AND patch_end_date
-ORDER BY name,match_id;'''
+    LEFT JOIN matches ON matches.start_time BETWEEN patch_start_date AND patch_end_date
+    ORDER BY name;'''
     cursor.execute(raw_query)
     #return PatchesSerializer(Patches(cursor.fetchall())).data # really slow
     return Response(serializePatches(cursor.fetchall()))  

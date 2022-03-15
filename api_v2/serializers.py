@@ -8,7 +8,7 @@ def serializePatches(data) -> Dict:
     current_patch = ""
     for row in data:
         if current_patch != row[0]:
-            patches.append({"patch_version": row[0],"patch_start_date": float(row[1]), "patch_end_date": float(row[2]), "matches" : []})
+            patches.append({"patch_version": row[0],"patch_start_date": row[1], "patch_end_date": row[2], "matches" : []})
             current_patch = row[0]
         if(row[3] == None and row[4] == None):
            continue
