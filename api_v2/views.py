@@ -109,7 +109,7 @@ def getObjectives(request, id):
     INNER JOIN heroes ON heroes.id = hero_id
 	INNER JOIN matches ON matches.id = match_id
 	LEFT JOIN game_objectives ON match_player_detail_id_1 = matches_players_details.id
-	WHERE players.id =  14944
+	WHERE players.id =  {:}
 	GROUP BY  players.id,COALESCE(nick,'unknown'),localized_name,
 	match_id,subtype
 	ORDER BY match_id,localized_name;'''.format(id)
@@ -131,7 +131,7 @@ INNER JOIN matches_players_details ON player_id = players.id
 INNER JOIN heroes ON hero_id = heroes.id
 INNER JOIN ability_upgrades ON match_player_detail_id = matches_players_details.id
 INNER JOIN abilities ON abilities.id = ability_id
-WHERE player_id = 14944
+WHERE player_id = {:}
 GROUP BY players.id, COALESCE(nick,'unknown'),localized_name,match_id, abilities.name
 ORDER BY match_id, abilities.name'''.format(id)
     cursor.execute(raw_query)
