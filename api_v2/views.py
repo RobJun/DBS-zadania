@@ -16,37 +16,6 @@ from api_v2.serializers import serializeAbilities, serializeObjectives, serializ
 
 
 
-'''SELECT 
-	name as patch_version,
-	patch_start_date,
-	patch_end_date,
-	matches.id as match_id,
-	ROUND((matches.duration::numeric / 60),2)::float as match_duration
-    FROM (
-	    SELECT name,
-	    cast(extract(epoch from release_date) as integer) as patch_start_date,
-        cast(extract(epoch from LEAD(release_date,1) OVER (ORDER BY name)) as integer) as patch_end_date
-        FROM patches
-	) as myquery 
-    LEFT JOIN matches ON matches.start_time BETWEEN patch_start_date AND patch_end_date
-    ORDER BY name;'''
-
-
-''''''
-
-# OR
-'''
-SELECT subtab.id,nick,match_id,localized_name,
-ROUND((matches.duration::numeric / 60),2)::float,
-COALESCE(matches_players_details.xp_hero,0) + COALESCE(matches_players_details.xp_creep,0)+ COALESCE(matches_players_details.xp_other,0) + COALESCE(matches_players_details.xp_roshan,0) as exp_gained,
-matches_players_details.level,
-matches.radiant_win = (matches_players_details.player_slot BETWEEN 0 and 4) as winner
-FROM (SELECT * FROM players WHERE id = $id) as subtab
-INNER JOIN matches_players_details ON subtab.id = player_id
-INNER JOIN heroes ON heroes.id = hero_id
-INNER JOIN matches ON match_id = matches.id
-'''
-
 def connect():
     return psycopg2.connect(
         database=os.getenv("DBNAME"),
