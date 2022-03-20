@@ -46,6 +46,7 @@ def getPatches(request):
     return Response(serializePatches(cursor.fetchall()))  
 
 @api_view(['GET'])
+@renderer_classes([decimalJSONRenderer,])
 def getGame_exp(request,id):
     cursor = connect().cursor()
     raw_query = '''SELECT players.id,COALESCE(nick,'unknown') as player_nick,
