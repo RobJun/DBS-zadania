@@ -37,16 +37,16 @@ SELECT players.id,COALESCE(nick,'unknown') as player_nick,
 ### v2/players/{id}/game_objectives/
 ```sql
 SELECT players.id,COALESCE(nick,'unknown') as player_nick,localized_name as hero_localized_name,
-	match_id,COALESCE(subtype,'NO_ACTION') as hero_action, COUNT(COALESCE(subtype,'NO_ACTION')) as count
+    match_id,COALESCE(subtype,'NO_ACTION') as hero_action, COUNT(COALESCE(subtype,'NO_ACTION')) as count
     FROM players
-   	INNER JOIN matches_players_details ON players.id = player_id
+    INNER JOIN matches_players_details ON players.id = player_id
     INNER JOIN heroes ON heroes.id = hero_id
-	INNER JOIN matches ON matches.id = match_id
-	LEFT JOIN game_objectives ON match_player_detail_id_1 = matches_players_details.id
-	WHERE players.id =  {id}
-	GROUP BY  players.id,COALESCE(nick,'unknown'),localized_name,
-	match_id,subtype
-	ORDER BY match_id,localized_name;
+    INNER JOIN matches ON matches.id = match_id
+    LEFT JOIN game_objectives ON match_player_detail_id_1 = matches_players_details.id
+    WHERE players.id =  {id}
+    GROUP BY  players.id,COALESCE(nick,'unknown'),localized_name,
+    match_id,subtype
+    ORDER BY match_id,localized_name;
 ```
 ### v2/players/{id}/abilities/
 ```sql
@@ -58,6 +58,7 @@ COUNT(*) as count,
 MAX(ability_upgrades.level) as upgrade_level
 FROM players
 INNER JOIN matches_players_details ON player_id = players.id
+INNER JOIN matches ON match_id = matches.id
 INNER JOIN heroes ON hero_id = heroes.id
 INNER JOIN ability_upgrades ON match_player_detail_id = matches_players_details.id
 INNER JOIN abilities ON abilities.id = ability_id

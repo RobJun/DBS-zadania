@@ -94,6 +94,7 @@ COUNT(*) as count,
 MAX(ability_upgrades.level) as upgrade_level
 FROM players
 INNER JOIN matches_players_details ON player_id = players.id
+INNER JOIN matches ON match_id = matches.id
 INNER JOIN heroes ON hero_id = heroes.id
 INNER JOIN ability_upgrades ON match_player_detail_id = matches_players_details.id
 INNER JOIN abilities ON abilities.id = ability_id
