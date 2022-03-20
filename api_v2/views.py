@@ -7,13 +7,9 @@ from rest_framework.views import APIView
 
 import psycopg2
 import os
-import json
-import re
-from api_v2.models import Patches, PatchesSerializer
 
 from api_v2.renderers import decimalJSONRenderer
 from api_v2.serializers import serializeAbilities, serializeObjectives, serializePatches, serializePlayerExp
-
 
 
 def connect():
