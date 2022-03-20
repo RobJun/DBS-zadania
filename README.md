@@ -21,7 +21,7 @@ SELECT
 ``` sql
 SELECT players.id,COALESCE(nick,'unknown') as player_nick,
     localized_name as hero_localized_name,
-    ROUND((matches.duration::numeric / 60),2)::float as match_duration_minutes,
+    ROUND((matches.duration::numeric / 60),2) as match_duration_minutes,
     COALESCE(xp_hero,0) + COALESCE(xp_creep,0)+ COALESCE(xp_other,0) + COALESCE(xp_roshan,0) as experiences_gained,
     level as level_gained,
     matches.radiant_win = (player_slot BETWEEN 0 and 4) as winner,
@@ -31,7 +31,7 @@ SELECT players.id,COALESCE(nick,'unknown') as player_nick,
     INNER JOIN heroes ON heroes.id = hero_id
     INNER JOIN matches ON match_id = matches.id
     WHERE players.id = {id}
-	ORDER BY match_id;
+    ORDER BY match_id;
 ```
     
 ### v2/players/{id}/game_objectives/
