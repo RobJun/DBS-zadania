@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 import psycopg2
 import os
 
-from api_v3.serializers import seriliazePurchases
+from api_v3.serializers import seriliazePurchases,serializeUsage
 
 
 def connect():
@@ -45,5 +45,36 @@ ORDER BY hero_id ASC,rank ASC'''.format(id)
 
 
 @api_view(['GET'])
-def dummy(request):
+def getUsage(request,id):
+    print(id)
+    cursor = connect().cursor()
+    query = '''with ability as (SELECT abilities.id,
+				 abilities.name,
+				 hero_id,
+				 localized_name,
+				 matches.radiant_win = (player_slot BETWEEN 0 and 4) as winner,
+				 case when 10*FLOOR((time*100/duration)/10) < 101 then 10*FLOOR((time*100/duration)/10) || '-' || 10*FLOOR((time*100/duration)/10)+9
+		 		 else '100-109'
+				 end bucket,
+				 COUNT(*)
+				 FROM abilities
+				 LEFT JOIN ability_upgrades ON abilities.id = ability_id
+				 LEFT JOIN matches_players_details as mpd ON match_player_detail_id = mpd.id
+				 LEFT JOIN heroes ON hero_id = heroes.id
+				 LEFT JOIN matches ON match_id = matches.id
+				 WHERE abilities.id = {:}
+				 GROUP BY abilities.id, abilities.name, hero_id, localized_name,winner,bucket
+				)
+SELECT * FROM (SELECT ability.*,RANK() OVER (
+	PARTITION BY hero_id,winner
+	ORDER BY count DESC,bucket ASC
+) FROM ability) as res
+WHERE rank =1
+ORDER BY hero_id ASC ,winner DESC'''.format(id)
+    cursor.execute(query)
+    return Response(serializeUsage(cursor.fetchall()))
+
+
+@api_view(['GET'])
+def getTowerKills(request):
     return Response({"dummy" : "dummy"})

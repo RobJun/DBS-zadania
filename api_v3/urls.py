@@ -3,6 +3,6 @@ from  . import views
 
 urlpatterns = [
     path('matches/<int:id>/top_purchases/',views.getTopPurchases),
-    path('abilities/<int:id>/usage/', views.dummy),
-    path('statistics/towe_kills/',views.dummy)
+    path('abilities/<int:id>/usage/', views.getUsage),
+    path('statistics/tower_kills/',views.getTowerKills)
 ]
