@@ -21,9 +21,17 @@ def serializeUsage(data)-> Dict:
     current_hero = None
     for row in data:
         if current_hero != row[2]:
-            usage["heroes"].append({"id": row[2],"name": row[3],"usage_winners" : {},"usage_loosers":{}})
+            usage["heroes"].append({"id": row[2],"name": row[3]})
             current_hero = row[2]
         if(row[4]): usage["heroes"][-1]["usage_winners"] = {"bucket" : row[5],"count" : row[6]}
-        else: usage["heroes"][-1]["usage_loosers"] = {"bucket" : row[5],"count" : row[6]}
+        elif(not row[4]): usage["heroes"][-1]["usage_loosers"] = {"bucket" : row[5],"count" : row[6]}
 
     return usage
+
+def serializeTowers(data) -> Dict:
+    if data == []:  return {}
+    heroArray = []
+    for row in data:
+        heroArray.append({"id" : row[0],"name" : row[1], "tower_kills": row[2]})
+
+    return {"heroes" : heroArray}

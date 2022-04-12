@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 import psycopg2
 import os
 
-from api_v3.serializers import seriliazePurchases,serializeUsage
+from api_v3.serializers import seriliazePurchases,serializeUsage,serializeTowers
 
 
 def connect():
@@ -23,11 +23,12 @@ def connect():
 @api_view(['GET'])
 def getTopPurchases(request,id):
     cursor = connect().cursor()
-    query='''with res as (SELECT match_id,hero_id,localized_name, item_id,items.name,COUNT(*) FROM matches_players_details
+    query='''with res as (SELECT match_id,hero_id,localized_name, item_id,items.name,COUNT(*) FROM matches
+INNER JOIN matches_players_details ON match_id = matches.id
 INNER JOIN heroes ON heroes.id = hero_id 
 LEFT JOIN purchase_logs ON match_player_detail_id = matches_players_details.id
 INNER JOIN items ON item_id = items.id
-WHERE match_id ={:}
+WHERE match_id ={:} and ( matches.radiant_win = (player_slot BETWEEN 0 and 4))
 GROUP BY match_id,hero_id,localized_name, item_id,items.name
 )
 SELECT * FROM (
@@ -46,7 +47,6 @@ ORDER BY hero_id ASC,rank ASC'''.format(id)
 
 @api_view(['GET'])
 def getUsage(request,id):
-    print(id)
     cursor = connect().cursor()
     query = '''with ability as (SELECT abilities.id,
 				 abilities.name,
@@ -77,4 +77,25 @@ ORDER BY hero_id ASC ,winner DESC'''.format(id)
 
 @api_view(['GET'])
 def getTowerKills(request):
-    return Response({"dummy" : "dummy"})
+    cursor = connect().cursor()
+    query = '''with res as (SELECT hero_id,localized_name,match_id,subtype, time FROM heroes
+LEFT JOIN matches_players_details as mpd ON hero_id = heroes.id
+LEFT JOIN matches ON match_id = matches.id
+LEFT JOIN game_objectives as go ON match_player_detail_id_1 = mpd.id
+WHERE go.subtype = 'CHAT_MESSAGE_TOWER_KILL' and time <= duration
+ORDER BY match_id ASC, time ASC)
+SELECT hero_id,localized_name,max(seqnum) as sequence FROM (
+select hero_id,localized_name,match_id,
+       row_number() over (partition by hero_id,match_id, grp order by match_id ASC, time ASC) as seqnum
+from (select res.*,
+             (row_number() over (order by match_id ASC, time ASC) -
+              row_number() over (partition by hero_id,match_id order by match_id ASC, time ASC)
+             ) as grp
+      from res
+     ) as t
+ORDER BY match_id ASC, time ASC
+	) as ta
+GROUP BY hero_id,localized_name
+ORDER BY sequence DESC, localized_name ASC'''
+    cursor.execute(query)
+    return Response(serializeTowers(cursor.fetchall()))
