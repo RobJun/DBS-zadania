@@ -58,7 +58,7 @@ def getUsage(request,id):
 				 end bucket,
 				 COUNT(*)
 				 FROM abilities
-				 LEFT JOIN ability_upgrades ON abilities.id = ability_id
+				 INNER JOIN ability_upgrades ON abilities.id = ability_id
 				 LEFT JOIN matches_players_details as mpd ON match_player_detail_id = mpd.id
 				 LEFT JOIN heroes ON hero_id = heroes.id
 				 LEFT JOIN matches ON match_id = matches.id
@@ -78,23 +78,22 @@ ORDER BY hero_id ASC ,winner DESC'''.format(id)
 @api_view(['GET'])
 def getTowerKills(request):
     cursor = connect().cursor()
-    query = '''with res as (SELECT hero_id,localized_name,match_id,subtype, time FROM heroes
-LEFT JOIN matches_players_details as mpd ON hero_id = heroes.id
-LEFT JOIN matches ON match_id = matches.id
-LEFT JOIN game_objectives as go ON match_player_detail_id_1 = mpd.id
-WHERE go.subtype = 'CHAT_MESSAGE_TOWER_KILL' and time <= duration
-ORDER BY match_id ASC, time ASC)
+    query = '''
+with res as (SELECT hero_id,localized_name,match_id,subtype, time FROM heroes
+    LEFT JOIN matches_players_details as mpd ON hero_id = heroes.id
+    LEFT JOIN matches ON match_id = matches.id
+    LEFT JOIN game_objectives as go ON match_player_detail_id_1 = mpd.id
+    WHERE go.subtype = 'CHAT_MESSAGE_TOWER_KILL' and time <= duration
+    ORDER BY match_id ASC, time ASC)
 SELECT hero_id,localized_name,max(seqnum) as sequence FROM (
-select hero_id,localized_name,match_id,
-       row_number() over (partition by hero_id,match_id, grp order by match_id ASC, time ASC) as seqnum
-from (select res.*,
+    select hero_id,localized_name,match_id,
+    row_number() over (partition by hero_id,match_id, poradie order by match_id ASC, time ASC) as seqnum
+    from (select res.*,
              (row_number() over (order by match_id ASC, time ASC) -
               row_number() over (partition by hero_id,match_id order by match_id ASC, time ASC)
-             ) as grp
-      from res
-     ) as t
-ORDER BY match_id ASC, time ASC
-	) as ta
+             ) as poradie
+            from res ) as t
+    ORDER BY match_id ASC, time ASC ) as ta
 GROUP BY hero_id,localized_name
 ORDER BY sequence DESC, localized_name ASC'''
     cursor.execute(query)
