@@ -31,7 +31,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -39,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    'api_v4',
     
 ]
 
@@ -75,12 +75,36 @@ WSGI_APPLICATION = 'dbs.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE':'django.db.backends.postgresql_psycopg2',
+        'NAME':'postgres',
+        'USER':os.getenv('DBUSER'),
+        'PASSWORD':os.getenv('DBPASS'),
+        'HOST':'127.0.0.1',
+        'PORT':os.getenv("DBPORT"),
+    },
+    'primary': {
+        'ENGINE':'django.db.backends.postgresql_psycopg2',
+        'NAME':os.getenv("DBNAME"),
+        'USER':os.getenv('DBUSER'),
+        'PASSWORD':os.getenv('DBPASS'),
+        'HOST':os.getenv('DBHOST'),
+        'PORT':os.getenv("DBPORT"),
     }
+}
+
+DATABASE_ROUTERS = ['api_v4.routers.Router',]
+MIGRATION_MODULES = {
+    'auth': None,
+    'contenttypes': None,
+    'default': None,
+    'sessions': None,
+
+    'core': None,
+    'profiles': None,
+    'snippets': None,
+    'scaffold_templates': None,
 }
 
 

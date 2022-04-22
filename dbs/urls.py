@@ -20,4 +20,5 @@ urlpatterns = [
     path('v1/', include('api.urls')),
     path('v2/',include('api_v2.urls')),
     path('v3/',include('api_v3.urls')),
+    path('v4/',include('api_v4.urls')),
 ]
