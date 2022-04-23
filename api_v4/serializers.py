@@ -17,7 +17,7 @@ def serializePatches(data) -> Dict:
 
 
 def serializePlayerExp(data) -> Dict:
-    if data == []:  return {}
+    if data.count() == 0:  return {}
     player_details = {"id" : data[0]['player__id'], "player_nick" : data[0]['player_nick'], "matches" : []}
     for row in data:
         player_details["matches"].append({"match_id": row['match__id'],
@@ -31,7 +31,7 @@ def serializePlayerExp(data) -> Dict:
 
 
 def serializeObjectives(data) -> Dict:
-    if data == []:  return {}
+    if data.count() == 0:  return {}
     current_match = None
     player_details = {"id" : data[0]['player__id'], "player_nick" : data[0]['player_nick'], "matches" : []}
     for row in data:
@@ -44,7 +44,7 @@ def serializeObjectives(data) -> Dict:
 
 
 def serializeAbilities(data) -> Dict:
-    if data == []:  return {}
+    if data.count() == 0:  return {}
     current_match = None
     player_details = {"id" : data[0]['player__id'], "player_nick" : data[0]['player_nick'], "matches" : []}
     for row in data:
@@ -53,3 +53,16 @@ def serializeAbilities(data) -> Dict:
             current_match = (row['match__id'],row['hero__localized_name'])
         player_details["matches"][-1]["abilities"].append({"ability_name": row['mpd__ability__name'],"count": row['count'],"upgrade_level": row['upgrade_level']})
     return player_details
+
+
+    
+def seriliazePurchases(data) -> Dict:
+    if data.count() == 0:  return {}
+    current_hero = None
+    purchases = {"id" : data[0]['M_match_id'], "heroes" :[]}
+    for row in data:
+        if current_hero != row['M_hero_id']:
+            purchases["heroes"].append({"id": row['M_hero_id'], "name": row['M_hero_localized_name'], "top_purchases": []})
+            current_hero =  row['M_hero_id']
+        purchases["heroes"][-1]["top_purchases"].append({"id": row['M_item_id'],"name": row['M_item_name'],"count" : row['pur_count']})
+    return purchases

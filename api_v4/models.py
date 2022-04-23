@@ -70,6 +70,7 @@ class MP_details(models.Model):
     class Meta:
         db_table='matches_players_details'
         managed=False
+    objects = CTEManager()
     id = models.IntegerField(primary_key=True)
     match = models.ForeignKey(Matches,on_delete=models.CASCADE)
     player = models.ForeignKey(Players,on_delete=models.CASCADE)
@@ -123,7 +124,7 @@ class Player_times(models.Model):
 
 class Purchase_logs(models.Model):
     id = models.IntegerField(primary_key=True)
-    match_player_detail = models.ForeignKey(MP_details,on_delete=models.CASCADE)
+    match_player_detail = models.ForeignKey(MP_details,on_delete=models.CASCADE, related_name='purchases')
     item = models.ForeignKey(Items,on_delete=models.CASCADE)
     time = models.IntegerField()
     class Meta:
