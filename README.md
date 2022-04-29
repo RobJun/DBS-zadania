@@ -91,22 +91,22 @@ ORDER BY hero_id ASC,rank ASC
 ### /v3/abilities/{id}/usage/
 ```sql
 with ability as (SELECT abilities.id,
-	abilities.name,
-	hero_id,
-	localized_name,
-	matches.radiant_win = (player_slot BETWEEN 0 and 4) as winner,
-	case when 10*FLOOR((time*100/duration)/10) < 101 then 10*FLOOR((time*100/duration)/10) || '-' || 10*FLOOR((time*100/duration)/10)+9
-	else '100-109'
-	end bucket,
-	COUNT(*)
-	FROM abilities
-	INNER JOIN ability_upgrades ON abilities.id = ability_id
-	LEFT JOIN matches_players_details as mpd ON match_player_detail_impd.id
-	LEFT JOIN heroes ON hero_id = heroes.id
-	LEFT JOIN matches ON match_id = matches.id
-	WHERE abilities.id = {id}
-	GROUP BY abilities.id, abilities.name, hero_localized_name,winner,bucket
-	)
+				 abilities.name,
+				 hero_id,
+				 localized_name,
+				 matches.radiant_win = (player_slot BETWEEN 0 and 4) as winner,
+				 case when 10*FLOOR((time*100/duration)/10) < 101 then 10*FLOOR((time*100/duration)/10) || '-' || 10*FLOOR((time*100/duration)/10)+9
+		 		 else '100-109'
+				 end bucket,
+				 COUNT(*)
+				 FROM abilities
+				 INNER JOIN ability_upgrades ON abilities.id = ability_id
+				 LEFT JOIN matches_players_details as mpd ON match_player_detail_id = mpd.id
+				 LEFT JOIN heroes ON hero_id = heroes.id
+				 LEFT JOIN matches ON match_id = matches.id
+				 WHERE abilities.id = {id}
+				 GROUP BY abilities.id, abilities.name, hero_id, localized_name,winner,bucket
+				)
 SELECT * FROM (SELECT ability.*,RANK() OVER (
 	PARTITION BY hero_id,winner
 	ORDER BY count DESC,bucket ASC
