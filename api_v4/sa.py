@@ -23,5 +23,6 @@ Patches = api_v4.models.Patches.sa
 def Session():
     from aldjemy.core import get_engine
     engine = get_engine(alias='primary')
+    #engine = get_engine()
     _Session = sessionmaker(bind=engine)
     return _Session()

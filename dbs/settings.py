@@ -76,10 +76,22 @@ WSGI_APPLICATION = 'dbs.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+'''
 DATABASES = {
     'default': {
         'ENGINE':'django.db.backends.postgresql_psycopg2',
-        'NAME':'postgres',
+        'NAME':os.getenv("DBNAME"),
+        'USER':os.getenv('DBUSER'),
+        'PASSWORD':os.getenv('DBPASS'),
+        'HOST':'127.0.0.1',
+        'PORT':os.getenv("DBPORT"),
+    }
+}
+'''
+DATABASES = {
+    'default': {
+        'ENGINE':'django.db.backends.postgresql_psycopg2',
+        'NAME':os.getenv("DBNAME"),
         'USER':os.getenv('DBUSER'),
         'PASSWORD':os.getenv('DBPASS'),
         'HOST':'127.0.0.1',
@@ -96,18 +108,6 @@ DATABASES = {
 }
 
 DATABASE_ROUTERS = ['api_v4.routers.Router',]
-MIGRATION_MODULES = {
-    'auth': None,
-    'contenttypes': None,
-    'default': None,
-    'sessions': None,
-
-    'core': None,
-    'profiles': None,
-    'snippets': None,
-    'scaffold_templates': None,
-}
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators

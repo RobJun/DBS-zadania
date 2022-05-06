@@ -7,7 +7,6 @@ class Regions(models.Model):
     name = models.TextField()
     class Meta:
         db_table='cluster_regions'
-        managed=False
 
 class Matches(models.Model):
     objects = CTEManager()
@@ -26,7 +25,6 @@ class Matches(models.Model):
     positive_votes =  models.IntegerField()
     class Meta:
         db_table='matches'
-        managed=False
 
 
 class Heroes(models.Model):
@@ -35,7 +33,6 @@ class Heroes(models.Model):
     localized_name = models.TextField()
     class Meta:
         db_table='heroes'
-        managed=False
 
 class Players(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -43,7 +40,6 @@ class Players(models.Model):
     nick = models.TextField()
     class Meta:
         db_table='players'
-        managed=False
 
 
 class Player_ratings(models.Model):
@@ -55,7 +51,6 @@ class Player_ratings(models.Model):
     trueskill_sigma = models.DecimalField(max_digits=15,decimal_places=4)
     class Meta:
         db_table='player_ratings'
-        managed=False
 
 
 class Items(models.Model):
@@ -63,13 +58,11 @@ class Items(models.Model):
      name = models.TextField()
      class Meta:
         db_table='items'
-        managed=False
 
 
 class MP_details(models.Model):
     class Meta:
         db_table='matches_players_details'
-        managed=False
     objects = CTEManager()
     id = models.IntegerField(primary_key=True)
     match = models.ForeignKey(Matches,on_delete=models.CASCADE)
@@ -120,7 +113,6 @@ class Player_times(models.Model):
     xp = models.IntegerField()
     class Meta:
         db_table='player_times'
-        managed=False
 
 class Purchase_logs(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -129,14 +121,12 @@ class Purchase_logs(models.Model):
     time = models.IntegerField()
     class Meta:
         db_table='purchase_logs'
-        managed=False
 
 class Abilities(models.Model):
     id = models.IntegerField(primary_key=True)
     name = models.TextField()
     class Meta:
         db_table='abilities'
-        managed=False
 
 class Chats(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -146,7 +136,6 @@ class Chats(models.Model):
     nick = models.TextField()
     class Meta:
         db_table='chats'
-        managed=False
 
 class Objectives(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -160,7 +149,6 @@ class Objectives(models.Model):
     slot = models.IntegerField()
     class Meta:
         db_table='game_objectives'
-        managed=False
 
 class Ability_upgrades(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -170,7 +158,6 @@ class Ability_upgrades(models.Model):
     time = models.IntegerField()
     class Meta:
         db_table='ability_upgrades'
-        managed=False
 
 class Teamfights(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -181,7 +168,6 @@ class Teamfights(models.Model):
     deaths = models.IntegerField()
     class Meta:
         db_table='teamfights'
-        managed=False
 
 class Teamfights_players(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -195,7 +181,6 @@ class Teamfights_players(models.Model):
     xp_end = models.IntegerField()
     class Meta:
         db_table='teamfights_players'
-        managed=False
 
 class Player_actions(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -230,7 +215,6 @@ class Player_actions(models.Model):
     move_to_direction =  models.IntegerField(db_column='unit_order_move_to_direction')
     class Meta:
         db_table='player_actions'
-        managed=False
         
 class Patches(models.Model):
     objects = CTEManager()
@@ -239,7 +223,6 @@ class Patches(models.Model):
     release_date = models.DateTimeField()
     class Meta:
         db_table='patches'
-        managed=False
 
     
     
