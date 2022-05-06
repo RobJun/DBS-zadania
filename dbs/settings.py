@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 import os
 from pathlib import Path
+import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,6 +27,9 @@ SECRET_KEY = os.getenv("DJ_SALT")
 DEBUG = True
 
 ALLOWED_HOSTS = []
+
+logging.basicConfig()
+logging,logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 
 # Application definition
@@ -90,12 +94,8 @@ DATABASES = {
 '''
 DATABASES = {
     'default': {
-        'ENGINE':'django.db.backends.postgresql_psycopg2',
-        'NAME':os.getenv("DBNAME"),
-        'USER':os.getenv('DBUSER'),
-        'PASSWORD':os.getenv('DBPASS'),
-        'HOST':'127.0.0.1',
-        'PORT':os.getenv("DBPORT"),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     },
     'primary': {
         'ENGINE':'django.db.backends.postgresql_psycopg2',

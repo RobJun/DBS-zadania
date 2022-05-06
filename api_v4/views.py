@@ -3,10 +3,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view,renderer_classes
 from rest_framework.views import APIView
 from api_v4 import sa
-
-from api_v4.models import MP_details, Matches, Patches, Players
+from api_v4.sa import Heroes, Objectives, Session
+from api_v2.renderers import decimalJSONRenderer
 from api_v2.serializers import serializePatches,serializePlayerExp,serializeObjectives,serializeAbilities
 from api_v3.serializers import seriliazePurchases,serializeUsage,serializeTowers
+
 from rest_framework import serializers
 from django.db.models.functions import Cast,Extract,Lead,Round,Coalesce,Rank,Floor
 from django.db.models.expressions import Window
@@ -15,13 +16,15 @@ from django.db.models import F,Subquery,OuterRef,Value, Q,Count, Max,When,Case
 from django_cte import With
 from django.db.models.sql.constants import LOUTER
 
-from api_v4.sa import Heroes, Objectives, Session
+import logging
+
 from sqlalchemy import select,Numeric,cast,extract,Integer,and_,Text
 from sqlalchemy.orm  import aliased
 from sqlalchemy.sql import func,case,desc
 from . import sa
 
 @api_view(['GET'])
+@renderer_classes([decimalJSONRenderer,])
 def getPatches(req):
      session = Session()
      matches = select(sa.Matches.id,
@@ -36,20 +39,21 @@ def getPatches(req):
                      ).subquery()
      fin = select(patches,matches.c.id,matches.c.duration_minutes).join(matches,
           and_(matches.c.start_time >= patches.c.release_date,  matches.c.start_time <= patches.c.end_date),
-          isouter=True)
-     print(str(fin))
+          isouter=True).order_by(patches.c.name)
+
      return Response(serializePatches(session.execute(fin).all()))
 
 @api_view(['GET'])
+@renderer_classes([decimalJSONRenderer,])
 def getGame_exp(req,id):
      session = Session()
      players = select(
           sa.Players.id,
+          func.coalesce(sa.Players.nick,'unknown'),
           sa.Heroes.localized_name,
           func.round(cast(
                sa.Matches.duration,
                Numeric(10,2))/60,2).label('duration_minutes'),
-          func.coalesce(sa.Players.nick,'unknown'),
           func.coalesce(sa.MP_details.xp_hero,0) +
           func.coalesce(sa.MP_details.xp_creep,0) + 
           func.coalesce(sa.MP_details.xp_other,0) + 
@@ -62,7 +66,6 @@ def getGame_exp(req,id):
           join(sa.Matches).\
           join(sa.Heroes).\
           filter(sa.Players.id == id).order_by(sa.Matches.id)
-     print(str(players))
      return Response(serializePlayerExp(session.execute(players).all()))
 
 @api_view(['GET'])
@@ -87,7 +90,6 @@ def getObjectives(req,id):
           sa.Heroes.localized_name,
           sa.Matches.id,
           sa.Objectives.subtype).filter(sa.Players.id == id).order_by(sa.Matches.id,sa.Heroes.localized_name)
-     print(str(players))
      #
      #players = MP_details.objects.filter(player__id=id
      #).annotate(player_nick=Coalesce('player__nick',Value('unknown',output_field=models.TextField()))
@@ -120,7 +122,6 @@ def getAbilities(req,id):
           sa.Matches.id,
           sa.Abilities.name,
      ).filter(sa.Players.id==id).order_by(sa.Matches.id,sa.Abilities.name)
-     print(str(players))
      #
      #players = MP_details.objects.filter(player__id=id
      #).annotate(player_nick=Coalesce('player__nick',Value('unknown',output_field=models.TextField()))
@@ -158,8 +159,6 @@ def getTopPurchases(req,id):
           sa.Items.id,
           sa.Items.name,
      ).subquery()
-     print(str(purchases))
-
      rankPurchases = select(purchases, 
           func.rank().over(
                partition_by=purchases.c.id_1,
