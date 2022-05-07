@@ -80,6 +80,8 @@ class MP_details(models.Model):
     last_hits = models.IntegerField()
     stuns = models.IntegerField()
     hero_damage = models.IntegerField()
+    hero_healing = models.IntegerField()
+    tower_damage = models.IntegerField()
     item_1 = models.ForeignKey(Items,on_delete=models.CASCADE, db_column='item_id_1', related_name='item1')
     item_2 = models.ForeignKey(Items,on_delete=models.CASCADE, db_column='item_id_2', related_name='item2')
     item_3 = models.ForeignKey(Items,on_delete=models.CASCADE, db_column='item_id_3', related_name='item3')
