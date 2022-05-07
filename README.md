@@ -36,6 +36,7 @@ LEFT OUTER JOIN (SELECT matches.id AS id,
                 ON anon_2.start_time >= anon_1.release_date AND anon_2.start_time <= anon_1.end_date
 ORDER BY anon_1.name
 ```
+Hlavnými rozdielmi medzi našim a generovaným dopytom je použitie subquery v LEFT JOIN funkcií ako aj použitie LEFT OUTER JOIN namiesto nášho LEFT JOIN. Ďaľšou zmenou je poradie použití funkcií LEAD a CAST. V našom query najprv nájdeme ďalší riadok pomocou LEAD a potom ho premeníme na INT pomocou CAST. Generovaná query to robí naopak.
 
 EXPLAIN ANALYZE: 
 
@@ -56,6 +57,11 @@ EXPLAIN ANALYZE:
 |  |               ->  Seq Scan on matches  (cost=0.00..1016.00 rows=50000 width=12)   (actual time=0.024..497.689 rows=50000 loops=1) |
 |  | Planning Time: 0.306 ms |
 |  | Execution Time: 20778.369 ms |
+
+Plán pre našu query je kratší ako pre generovanú. Vygenerovaná na začiatku usporadúva  podľa patches name, čo sú kroky navyše. Kroky NESTED LOOP LEFT JOIN majú rovnaké hodnoty rows a hodnoty cost sú podobné cost_v2=1.59...18559.98 a cost_v4=1.59..18823.87. Rows sú vo všetkých riadkoch rovnaké.  Potom sú všetky kroky rovnaké, pričom sa líšia iba časom, kde je naša rýchlejšia až na riadok Materialize, ktorý je v našom 0.014..512.108 a v generovanom je time 0.012..515.989.
+
+Celkovo je generovaná query pomalšia kvôli prvotnému zoraďovaniu, ale inak rozdiely sú zanedbateľné.
+
 
 ### v2/players/{id}/game_exp/
 ``` sql
@@ -90,7 +96,10 @@ JOIN matches_players_details ON players.id = matches_players_details.player_id
 JOIN matches ON matches.id = matches_players_details.match_id 
 JOIN heroes ON heroes.id = matches_players_details.hero_id
 WHERE players.id = {id}
+ORDER BY matches.id
 ```
+Naša a generovaná query sú skoro rovnaké. Jediným rozdielom je použitie JOINOV. Kde my používame INNER JOIN, generovaná používa iba JOIN; Kde máme LEFT JOIN je použitý LEFT OUTER JOIN. Ďalej my na zoraďovanie používame matches_players_details.match_id. Generovaná používa matches.id. Ďalším rozdielom je, že sme pre pole winner použili BETWEEN a generovaná vypísala hranice pomocou >= a <=.
+
 EXPLAIN ANALYZE: 
 
 | v2 | v4 |
@@ -121,6 +130,12 @@ EXPLAIN ANALYZE:
 | Planning Time: 0.678 ms | Planning Time: 0.700 ms |
 | Execution Time: 26.385 ms | Execution Time: 34.403 ms |
     
+V prvom kroku ako aj v riadku 4 sa total cost pre v4 zvyšil  o 0.01. Po spustení workerov sa v našom query spustil Nested Loop  a po ňom hash join.  V generovanom sa spustil až po vykonaní hash joinu a mal výrazne menší cost ako pri našom. Na druhú stranu vykonanie týchto príkazov bolo u nás rýchlejšie. Vykonanie ďalšieho Nested Loop bolo u nás rýchlejšie. Následne Parallel Seq Scan bol rýchlejší pre našu query ako aj nasledujúce Index Scan-y. V našom query sa používa druhy Index Scan až po Hash a Seq Scan a v generovanej ešte pred nimi. Rows sú vo všetkých riadkoch rovnaké. Pre všetky kroky bol naše query rýchlejšie ako generované. Je to vidieť aj na celkovom čase plánovania a vykonávania. 
+
+Celkovo sa query od seba moc výzorovo moc nelíšia, ale generované query je pomalšie.
+
+
+
 ### v2/players/{id}/game_objectives/
 ```sql
 SELECT players.id,COALESCE(nick,'unknown') as player_nick,localized_name as hero_localized_name,
@@ -151,6 +166,8 @@ WHERE players.id = {id}
 GROUP BY players.id, coalesce(players.nick, 'unknown'), heroes.localized_name, matches.id, game_objectives.subtype
 ORDER BY matches.id, heroes.localized_name
 ```
+Naša a generovaná query sú skoro rovnaké. Jediným rozdielom je použitie JOINOV. Kde my používame INNER JOIN, generovaná používa iba JOIN; Kde máme LEFT JOIN je použitý LEFT OUTER JOIN. Ďalej my na zoraďovanie používame matches_players_details.match_id. Generovaná používa matches.id. 
+
 EXPLAIN ANALYZE: 
 
 | v2 | v4 |
@@ -186,6 +203,11 @@ EXPLAIN ANALYZE:
 | Planning Time: 1.064 ms | Planning Time: 0.990 ms |
 | Execution Time: 7518.312 ms | Execution Time: 7458.503 ms |
 
+Plán query sa nelíšia od seba do riadku 13, pričom generovaná query mala skutočný čas rýchlejší ako naša. Po riadku 13 sa v plánoch prehodili riadky HASH JOIN a NESTED LOOP. Náš Nested Loop mal väčší cost ako ten vo v4, ale rovnaký ako HASH JOIN v rovnakom riadku Na druhú stranu HASH JOIN v našom dopyte mal potom stále cost .54..13177.68, kde NESTED LOOP pre v4 mal iba cost 0.29..13199.05. Celkový čas pre tieto funkcie bol menší pre generovanú query. Parallel Seq pre obidve query boli porovnateľne rovnaké pričom generovaná bola rýchlejšia. Následne zase boli poprehadzované plánovača v našej idú: HASH ->Seq Scan -> Index Only Scan a vo v4: Index Only Scan -> Hash -> Seq Scan. Na druhú stranu je ich vykonanie porovnateľne rovnaké. Posledné kroky sú si podobne s tým, že v4 je rýchlejšie. Teda čas plánovania vykonania našej a generovanej query je podobné. Rows sú vo všetkých riadkoch rovnaké.
+
+Celkovo sú query rovnaké až na malé rozdiely a moc sa nerozlišujú ani časovo, ale generovaná v4 je rýchlejšia.
+
+
 ### v2/players/{id}/abilities/
 ```sql
 SELECT players.id, 
@@ -219,6 +241,9 @@ WHERE players.id = {id}
 GROUP BY players.id, coalesce(players.nick, 'unknown'), heroes.localized_name, matches.id, abilities.name
 ORDER BY matches.id, abilities.name
 ```
+
+Naša a generovaná query sú skoro rovnaké. Jediným rozdielom je použitie JOINOV. Kde my používame INNER JOIN, generovaná používa iba JOIN; Kde máme LEFT JOIN je použitý LEFT OUTER JOIN. Ďalej my na zoraďovanie používame matches_players_details.match_id. Generovaná používa matches.id.
+
 EXPLAIN ANALYZE: 
 
 | v2 | v4 |
@@ -236,7 +261,7 @@ EXPLAIN ANALYZE:
 |                     Workers Launched: 4 |                     Workers   Launched: 4 |
 |                     ->  Nested Loop    (cost=13178.27..98721.48 rows=45 width=44) (actual   time=14338.682..37861.469 rows=48 loops=5) |                     ->  Nested Loop    (cost=13178.27..98721.48 rows=45 width=44) (actual   time=18427.203..37523.101 rows=48 loops=5) |
 |                           ->  Hash Join    (cost=13178.00..98708.32 rows=45 width=26) (actual   time=14338.588..37859.194 rows=48 loops=5) |                             ->  Hash Join  (cost=13178.00..98708.32 rows=45 width=26)   (actual time=18427.124..37520.641 rows=48 loops=5) |
-|                                 Hash Cond:   (matches_players_details.hero_id = heroes.id) |                                   Hash Cond: (matches_players_details.hero_id = heroes.id) |
+|                                 Hash Cond:   (matches_players_details.hero_id = heroes.id) | Hash Cond: (matches_players_details.hero_id = heroes.id) |
 |                                 ->  Nested Loop    (cost=13174.46..98704.66 rows=45 width=20) (actual   time=14336.023..37855.654 rows=48 loops=5) |                                   ->  Nested Loop  (cost=13174.46..98704.66 rows=45 width=20)   (actual time=18424.070..37516.505 rows=48 loops=5) |
 |                                         ->  Parallel Hash Join  (cost=13174.17..98330.82 rows=45 width=20)   (actual time=14335.835..37853.182 rows=48 loops=5) |                                         ->  Parallel Hash Join  (cost=13174.17..98330.82 rows=45 width=20)   (actual time=18423.928..37513.881 rows=48 loops=5) |
 |                                               Hash Cond: (ability_upgrades.match_player_detail_id =   matches_players_details.id) |                                               Hash Cond: (ability_upgrades.match_player_detail_id =   matches_players_details.id) |
@@ -256,6 +281,11 @@ EXPLAIN ANALYZE:
 |                                 Index Cond:   (id = ability_upgrades.ability_id) |                                   Index Cond: (id = ability_upgrades.ability_id) |
 | Planning Time: 1.338 ms | Planning Time: 1.208 ms |
 | Execution Time: 37877.971 ms | Execution Time: 37543.124 ms |
+
+Obidva plány sú skoro totožné, líšia sa vo svojich plánoch iba v actual_time, kde vo väčšine prípadov bol generovaný rýchlejší.  A celkový čas plánovania a vykonávania bol zanedbateľne rýchlejší pre v4. Rows sú vo všetkých riadkoch rovnaké.
+
+Celkovo sú obidve query k sebe ekvivalentné.
+
 
 ## Zadanie 5 v3/...
 ### /v3/matches/{id}/top_purchases/
@@ -312,58 +342,66 @@ FROM (SELECT 	anon_2.id AS id,
 WHERE anon_1.rank < 6 
 ORDER BY anon_1.id_1, anon_1.rank
 ```
+Obidve query používajú 3 selecty (2 subquery), pričom naša používa na poslednú subquery WITH. Ďalším rozdielom je, že sme pre pole winner použili BETWEEN a generovaná vypísala hranice pomocou >= a <=.  Ďalším rozdielom je, že na vypísanie všetkých polí zo subquery sme použili res.\* a \*; A generovaná vypisovala všetky polia. Zároveň ako pri iných query je nami používané INNER JOIN iba JOIN v generovanom. Navyše kde sme použili LEFT JOIN a generovaná na jeho mieste použila iba JOIN. Filtrovanie podľa poradia je u nás dané <=5 a v generovanom je < 6.
+
 EXPLAIN ANALYZE: 
 
 | v3 	| v4 	|
 |---	|---	|
-| Sort    (cost=156859.95..156860.10 rows=61 width=52) (actual   time=99198.697..99199.122 rows=25 loops=1) 	| Sort  (cost=156858.80..156858.95   rows=61 width=52) (actual time=116250.463..116250.827 rows=25 loops=1) 	|
+| Sort    (cost=156859.95..156860.10 rows=61 width=52) (actual   time=76634.782..76635.016 rows=25 loops=1) 	| Sort  (cost=156858.80..156858.95   rows=61 width=52) (actual time=76673.764..76674.003 rows=25 loops=1) 	|
 |     Sort Key: res2.hero_id, res2.rank 	|   Sort Key: anon_1.id_1,   anon_1.rank 	|
 |     Sort Method: quicksort  Memory:   27kB 	|   Sort Method: quicksort  Memory: 27kB 	|
-|     ->  Subquery Scan on   res2  (cost=156851.77..156858.14   rows=61 width=52) (actual time=99190.014..99198.251 rows=25 loops=1) 	|   ->  Subquery Scan on anon_1  (cost=156850.62..156856.99 rows=61   width=52) (actual time=116243.350..116250.058 rows=25 loops=1) 	|
+|     ->  Subquery Scan on   res2  (cost=156851.77..156858.14   rows=61 width=52) (actual time=76629.808..76634.490 rows=25 loops=1) 	|   ->  Subquery Scan on anon_1  (cost=156850.62..156856.99 rows=61   width=52) (actual time=76668.757..76673.488 rows=25 loops=1) 	|
 |           Filter: (res2.rank <= 5) 	|         Filter: (anon_1.rank <   6) 	|
 |           Rows Removed by Filter: 88 	|         Rows Removed by Filter: 88 	|
-|           ->  WindowAgg  (cost=156851.77..156855.87 rows=182   width=52) (actual time=99189.986..99195.973 rows=113 loops=1) 	|         ->  WindowAgg    (cost=156850.62..156854.72 rows=182 width=52) (actual   time=116243.323..116248.154 rows=113 loops=1) 	|
-|               ->  Sort    (cost=156851.77..156852.23 rows=182 width=44) (actual   time=99189.888..99191.774 rows=113 loops=1) 	|               ->  Sort    (cost=156850.62..156851.08 rows=182 width=44) (actual   time=116243.247..116244.736 rows=113 loops=1) 	|
+|           ->  WindowAgg  (cost=156851.77..156855.87 rows=182   width=52) (actual time=76629.781..76633.175 rows=113 loops=1) 	|         ->  WindowAgg    (cost=156850.62..156854.72 rows=182 width=52) (actual   time=76668.732..76672.131 rows=113 loops=1) 	|
+|               ->  Sort    (cost=156851.77..156852.23 rows=182 width=44) (actual   time=76629.676..76630.749 rows=113 loops=1) 	|               ->  Sort    (cost=156850.62..156851.08 rows=182 width=44) (actual   time=76668.654..76669.725 rows=113 loops=1) 	|
 |                     Sort Key: res.hero_id,   res.count DESC, res.name 	|                     Sort Key:   anon_2.id_1, anon_2.count_1 DESC, anon_2.name 	|
 |                     Sort Method:   quicksort  Memory: 34kB 	|                     Sort Method:   quicksort  Memory: 34kB 	|
-|                     ->  Subquery Scan on res  (cost=156815.36..156844.94 rows=182   width=44) (actual time=99173.497..99187.760 rows=113 loops=1) 	|                     ->  Subquery Scan on anon_2  (cost=156815.36..156843.79 rows=182   width=44) (actual time=116235.357..116241.999 rows=113 loops=1) 	|
-|                           ->  Finalize GroupAggregate  (cost=156815.36..156843.12 rows=182   width=44) (actual time=99173.471..99184.008 rows=113 loops=1) 	|                             ->  Finalize   GroupAggregate    (cost=156815.36..156841.97 rows=182 width=44) (actual   time=116235.311..116239.712 rows=113 loops=1) 	|
+|                     ->  Subquery Scan on res  (cost=156815.36..156844.94 rows=182   width=44) (actual time=76617.706..76627.625 rows=113 loops=1) 	|                     ->  Subquery Scan on anon_2  (cost=156815.36..156843.79 rows=182   width=44) (actual time=76657.992..76667.366 rows=113 loops=1) 	|
+|                           ->  Finalize GroupAggregate  (cost=156815.36..156843.12 rows=182   width=44) (actual time=76617.681..76624.002 rows=113 loops=1) 	|                             ->  Finalize   GroupAggregate    (cost=156815.36..156841.97 rows=182 width=44) (actual   time=76657.969..76665.116 rows=113 loops=1) 	|
 |                                 Group Key:   matches_players_details.match_id, matches_players_details.hero_id,   heroes.localized_name, purchase_logs.item_id, items.name 	|                                   Group Key: matches.id, heroes.id, items.id 	|
-|                                 ->  Gather Merge  (cost=156815.36..156838.54 rows=184   width=44) (actual time=99173.389..99179.916 rows=114 loops=1) 	|                                   ->  Gather Merge  (cost=156815.36..156838.31 rows=184   width=44) (actual time=116235.243..116237.393 rows=114 loops=1) 	|
+|                                 ->  Gather Merge  (cost=156815.36..156838.54 rows=184   width=44) (actual time=76617.609..76620.087 rows=114 loops=1) 	|                                   ->  Gather Merge  (cost=156815.36..156838.31 rows=184   width=44) (actual time=76657.850..76662.708 rows=114 loops=1) 	|
 |                                       Workers   Planned: 4 	|                                         Workers Planned: 4 	|
-|                                       Workers   Launched: 4 	|                                         Workers Launched: 3 	|
-|                                         ->  Partial   GroupAggregate    (cost=155815.30..155816.57 rows=46 width=44) (actual   time=99162.678..99163.997 rows=23 loops=5) 	|                                         ->  Partial   GroupAggregate    (cost=155815.30..155816.34 rows=46 width=44) (actual   time=116228.126..116230.221 rows=28 loops=4) 	|
+|                                       Workers   Launched: 4 	|                                         Workers Launched: 4 	|
+|                                         ->  Partial   GroupAggregate    (cost=155815.30..155816.57 rows=46 width=44) (actual   time=76609.342..76610.828 rows=23 loops=5) 	|                                         ->  Partial   GroupAggregate    (cost=155815.30..155816.34 rows=46 width=44) (actual   time=76651.543..76652.579 rows=23 loops=5) 	|
 |                                               Group Key: matches_players_details.match_id,   matches_players_details.hero_id, heroes.localized_name,   purchase_logs.item_id, items.name 	|                                               Group Key: matches.id, heroes.id, items.id 	|
-|                                               ->  Sort  (cost=155815.30..155815.42 rows=46   width=36) (actual time=99162.625..99163.103 rows=38 loops=5) 	|                                               ->  Sort  (cost=155815.30..155815.42 rows=46   width=36) (actual time=116228.059..116228.831 rows=47 loops=4) 	|
+|                                               ->  Sort  (cost=155815.30..155815.42 rows=46   width=36) (actual time=76609.293..76609.855 rows=38 loops=5) 	|                                               ->  Sort  (cost=155815.30..155815.42 rows=46   width=36) (actual time=76651.498..76651.886 rows=38 loops=5) 	|
 |                                                     Sort Key: matches_players_details.hero_id, heroes.localized_name,   purchase_logs.item_id, items.name 	|                                                     Sort Key: heroes.id, items.id 	|
-|                                                     Sort Method: quicksort  Memory:   31kB 	|                                                     Sort Method: quicksort  Memory:   25kB 	|
-|                                                     Worker 0:  Sort Method:   quicksort  Memory: 25kB 	|                                                     Worker 0:  Sort Method:   quicksort  Memory: 25kB 	|
-|                                                     Worker 1:  Sort Method:   quicksort  Memory: 25kB 	|                                                     Worker 1:  Sort Method:   quicksort  Memory: 33kB 	|
-|                                                     Worker 2:  Sort Method:   quicksort  Memory: 33kB 	|                                                     Worker 2:  Sort Method:   quicksort  Memory: 31kB 	|
-|                                                     Worker 3:  Sort Method:   quicksort  Memory: 25kB 	|                                                     ->  Nested Loop  (cost=36.48..155814.03 rows=46 width=36)   (actual time=86179.464..116227.401 rows=47 loops=4) 	|
-|                                                     ->  Nested Loop  (cost=36.48..155814.03 rows=46 width=36)   (actual time=74782.068..99162.089 rows=38 loops=5) 	|                                                           ->  Hash Join  (cost=36.34..155806.44 rows=46 width=22)   (actual time=86179.369..116224.972 rows=47 loops=4) 	|
-|                                                           ->  Hash Join  (cost=36.34..155806.44 rows=46 width=22)   (actual time=74781.994..99160.216 rows=38 loops=5) 	|                                                                 Hash Cond: (matches_players_details.hero_id = heroes.id) 	|
-|                                                                 Hash Cond: (matches_players_details.hero_id = heroes.id) 	|                                                                 ->  Hash Join  (cost=32.79..155802.78 rows=46 width=12)   (actual time=86175.839..116220.381 rows=47 loops=4) 	|
-|                                                                 ->  Hash Join  (cost=32.79..155802.78 rows=46 width=12)   (actual time=74778.519..99155.931 rows=38 loops=5) 	|                                                                       Hash Cond: (((matches_players_details.player_slot >= 0) AND   (matches_players_details.player_slot <= 4)) = matches.radiant_win) 	|
-|                                                                       Hash Cond: (((matches_players_details.player_slot >= 0) AND   (matches_players_details.player_slot <= 4)) = matches.radiant_win) 	|                                                                       ->  Hash Join  (cost=24.47..155793.58 rows=91 width=16)   (actual time=71149.696..116218.681 rows=88 loops=4) 	|
-|                                                                       ->  Hash Join  (cost=24.47..155793.58 rows=91 width=16)   (actual time=62586.837..99153.894 rows=71 loops=5) 	|                                                                             Hash Cond: (purchase_logs.match_player_detail_id =   matches_players_details.id) 	|
-|                                                                             Hash Cond: (purchase_logs.match_player_detail_id =   matches_players_details.id) 	|                                                                             ->  Parallel Seq Scan on   purchase_logs  (cost=0.00..143829.36 rows=4548436   width=8) (actual time=0.025..58197.265 rows=4548436 loops=4) 	|
-|                                                                             ->  Parallel Seq Scan on   purchase_logs  (cost=0.00..143829.36 rows=4548436   width=8) (actual time=0.028..49710.940 rows=3638749 loops=5) 	|                                                                             ->  Hash  (cost=24.35..24.35 rows=10 width=16)   (actual time=0.382..0.395 rows=10 loops=4) 	|
-|                                                                             ->  Hash  (cost=24.35..24.35 rows=10 width=16)   (actual time=0.411..0.423 rows=10 loops=5) 	|                                                                                   Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|
-|                                                                                   Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|                                                                                   ->  Index Scan using   idx_match_id_player_id on matches_players_details  (cost=0.42..24.35 rows=10 width=16) (actual   time=0.060..0.220 rows=10 loops=4) 	|
-|                                                                                   ->  Index Scan using   idx_match_id_player_id on matches_players_details  (cost=0.42..24.35 rows=10 width=16) (actual   time=0.056..0.222 rows=10 loops=5) 	|                                                                                         Index Cond: (match_id = 21421) 	|
-|                                                                                         Index Cond: (match_id = 21421) 	|                                                                       ->  Hash  (cost=8.31..8.31 rows=1 width=5) (actual   time=0.112..0.125 rows=1 loops=4) 	|
-|                                                                       ->  Hash  (cost=8.31..8.31 rows=1 width=5) (actual   time=0.199..0.211 rows=1 loops=5) 	|                                                                             Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|
-|                                                                             Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|                                                                             ->  Index Scan using   matches_pk on matches  (cost=0.29..8.31   rows=1 width=5) (actual time=0.040..0.073 rows=1 loops=4) 	|
-|                                                                             ->  Index Scan using   matches_pk on matches  (cost=0.29..8.31   rows=1 width=5) (actual time=0.123..0.151 rows=1 loops=5) 	|                                                                                   Index Cond: (id = 21421) 	|
-|                                                                                   Index Cond: (id = 21421) 	|                                                                 ->  Hash  (cost=2.13..2.13 rows=113 width=14) (actual   time=3.437..3.457 rows=113 loops=4) 	|
-|                                                                 ->  Hash  (cost=2.13..2.13 rows=113 width=14) (actual   time=3.375..3.387 rows=113 loops=5) 	|                                                                       Buckets: 1024  Batches: 1  Memory Usage: 14kB 	|
-|                                                                       Buckets: 1024  Batches: 1  Memory Usage: 14kB 	|                                                                       ->  Seq Scan on heroes  (cost=0.00..2.13 rows=113 width=14) (actual   time=0.037..1.651 rows=113 loops=4) 	|
-|                                                                       ->  Seq Scan on heroes  (cost=0.00..2.13 rows=113 width=14) (actual   time=0.037..1.688 rows=113 loops=5) 	|                                                           ->  Index Scan using items_pk   on items  (cost=0.15..0.17 rows=1   width=18) (actual time=0.016..0.016 rows=1 loops=188) 	|
-|                                                           ->  Index Scan using items_pk   on items  (cost=0.15..0.17 rows=1   width=18) (actual time=0.015..0.015 rows=1 loops=188) 	|                                                                 Index Cond: (id = purchase_logs.item_id) 	|
-|                                                                 Index Cond: (id = purchase_logs.item_id) 	| Planning Time: 1.902 ms 	|
-| Planning Time: 1.419 ms 	| Execution Time: 116252.293 ms 	|
-| Execution Time: 99200.597 ms 	|  	|
+|                                                     Sort Method: quicksort  Memory:   25kB 	|                                                     Sort Method: quicksort  Memory:   33kB 	|
+|                                                     Worker 0:  Sort Method:   quicksort  Memory: 33kB 	|                                                     Worker 0:  Sort Method:   quicksort  Memory: 31kB 	|
+|                                                     Worker 1:  Sort Method:   quicksort  Memory: 25kB 	|                                                     Worker 1:  Sort Method:   quicksort  Memory: 25kB 	|
+|                                                     Worker 2:  Sort Method:   quicksort  Memory: 31kB 	|                                                     Worker 2:  Sort Method:   quicksort  Memory: 25kB 	|
+|                                                     Worker 3:  Sort Method:   quicksort  Memory: 25kB 	|                                                     Worker 3:  Sort Method:   quicksort  Memory: 25kB 	|
+|                                                     ->  Nested Loop  (cost=36.48..155814.03 rows=46 width=36)   (actual time=59215.667..76608.773 rows=38 loops=5) 	|                                                     ->  Nested Loop  (cost=36.48..155814.03 rows=46 width=36)   (actual time=58914.046..76651.020 rows=38 loops=5) 	|
+|                                                           ->  Hash Join  (cost=36.34..155806.44 rows=46 width=22)   (actual time=59215.574..76607.043 rows=38 loops=5) 	|                                                           ->  Hash Join  (cost=36.34..155806.44 rows=46 width=22)   (actual time=58913.983..76649.286 rows=38 loops=5) 	|
+|                                                                 Hash Cond: (matches_players_details.hero_id = heroes.id) 	|                                                                 Hash Cond: (matches_players_details.hero_id = heroes.id) 	|
+|                                                                 ->  Hash Join  (cost=32.79..155802.78 rows=46 width=12)   (actual time=59212.111..76602.832 rows=38 loops=5) 	|                                                                 ->  Hash Join  (cost=32.79..155802.78 rows=46 width=12)   (actual time=58911.300..76645.848 rows=38 loops=5) 	|
+|                                                                       Hash Cond: (((matches_players_details.player_slot >= 0) AND   (matches_players_details.player_slot <= 4)) = matches.radiant_win) 	|                                                                       Hash Cond: (((matches_players_details.player_slot >= 0) AND   (matches_players_details.player_slot <= 4)) = matches.radiant_win) 	|
+|                                                                       ->  Hash Join  (cost=24.47..155793.58 rows=91 width=16)   (actual time=50514.041..76601.487 rows=71 loops=5) 	|                                                                       ->  Hash Join  (cost=24.47..155793.58 rows=91 width=16)   (actual time=50041.389..76644.577 rows=71 loops=5) 	|
+|                                                                             Hash Cond: (purchase_logs.match_player_detail_id =   matches_players_details.id) 	|                                                                             Hash Cond: (purchase_logs.match_player_detail_id =   matches_players_details.id) 	|
+|                                                                             ->  Parallel Seq Scan on   purchase_logs  (cost=0.00..143829.36 rows=4548436   width=8) (actual time=0.022..38140.692 rows=3638749 loops=5) 	|                                                                             ->  Parallel Seq Scan on   purchase_logs  (cost=0.00..143829.36 rows=4548436   width=8) (actual time=0.020..38210.035 rows=3638749 loops=5) 	|
+|                                                                             ->  Hash  (cost=24.35..24.35 rows=10 width=16)   (actual time=0.384..0.396 rows=10 loops=5) 	|                                                                             ->  Hash  (cost=24.35..24.35 rows=10 width=16)   (actual time=0.325..0.334 rows=10 loops=5) 	|
+|                                                                                   Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|                                                                                   Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|
+|                                                                                   ->  Index Scan using   idx_match_id_player_id on matches_players_details  (cost=0.42..24.35 rows=10 width=16) (actual   time=0.049..0.201 rows=10 loops=5) 	|                                                                                   ->  Index Scan using   idx_match_id_player_id on matches_players_details  (cost=0.42..24.35 rows=10 width=16) (actual   time=0.047..0.182 rows=10 loops=5) 	|
+|                                                                                         Index Cond: (match_id = 21421) 	|                                                                                         Index Cond: (match_id = 21421) 	|
+|                                                                       ->  Hash  (cost=8.31..8.31 rows=1 width=5) (actual   time=0.126..0.138 rows=1 loops=5) 	|                                                                       ->  Hash  (cost=8.31..8.31 rows=1 width=5) (actual   time=0.089..0.098 rows=1 loops=5) 	|
+|                                                                             Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|                                                                             Buckets: 1024  Batches: 1  Memory Usage: 9kB 	|
+|                                                                             ->  Index Scan using   matches_pk on matches  (cost=0.29..8.31   rows=1 width=5) (actual time=0.054..0.083 rows=1 loops=5) 	|                                                                             ->  Index Scan using   matches_pk on matches  (cost=0.29..8.31   rows=1 width=5) (actual time=0.032..0.054 rows=1 loops=5) 	|
+|                                                                                   Index Cond: (id = 21421) 	|                                                                                   Index Cond: (id = 21421) 	|
+|                                                                 ->  Hash  (cost=2.13..2.13 rows=113 width=14) (actual   time=3.353..3.364 rows=113 loops=5) 	|                                                                 ->  Hash  (cost=2.13..2.13 rows=113 width=14) (actual   time=2.594..2.604 rows=113 loops=5) 	|
+|                                                                       Buckets: 1024  Batches: 1  Memory Usage: 14kB 	|                                                                       Buckets: 1024  Batches: 1  Memory Usage: 14kB 	|
+|                                                                       ->  Seq Scan on heroes  (cost=0.00..2.13 rows=113 width=14) (actual   time=0.038..1.667 rows=113 loops=5) 	|                                                                       ->  Seq Scan on heroes  (cost=0.00..2.13 rows=113 width=14) (actual   time=0.031..1.299 rows=113 loops=5) 	|
+|                                                           ->  Index Scan using items_pk   on items  (cost=0.15..0.17 rows=1   width=18) (actual time=0.014..0.014 rows=1 loops=188) 	|                                                           ->  Index Scan using items_pk   on items  (cost=0.15..0.17 rows=1   width=18) (actual time=0.014..0.014 rows=1 loops=188) 	|
+|                                                                 Index Cond: (id = purchase_logs.item_id) 	|                                                                 Index Cond: (id = purchase_logs.item_id) 	|
+| Planning Time: 10.922 ms 	| Planning Time: 1.894 ms 	|
+| Execution Time: 76635.996 ms 	| Execution Time: 76675.031 ms 	|
+
+Väčšina riadkov v analýze v3 a v4 sú rovnaké, jedine čo sa vo väčšine mení iba actual_time. Cost je rôzny iba v niektorých krokoch, ale rozdiely sú minimálne (napr. v riadku 3. Scan Query ich rozdiely sú 1.15..1.15). Rows sú vo všetkých riadkoch rovnaké. Vykonanie je približne rovnaké, ale naplánovanie našej query trvalo viac ako 5x toľko ako generovanej.
+
+Celkovo sú dopyty rovnaké, ale my sme využili WITH a plánovanie nášho dopytu trvalo 5x toľko.
+
+
 
 ### /v3/abilities/{id}/usage/
 ```sql
@@ -420,6 +458,8 @@ FROM (SELECT 	anon_2.id AS id, anon_2.name AS name,
 	)AS anon_1
 WHERE anon_1.rank = 1 ORDER BY anon_1.hero_id, anon_1.winner
 ```
+Obidve query používajú 3 selecty (2 subquery), pričom naša používa na poslednú subquery WITH. Ďalším rozdielom je, že sme pre pole winner použili BETWEEN a generovaná vypísala hranice pomocou >= a <=. Navyše pri skladaní stringov mi máme iba vzorec, ktorý sa pripája a generovaná pomocou AS ho konvertuje na TEXT. Zároveň ako pri iných query je nami používané INNER JOIN iba JOIN v generovanom. Navyše kde sme použili LEFT JOIN a generovaná na jeho mieste použila iba JOIN.
+
 EXPLAIN ANALYZE: 
 
 | v3 	| v4 	|
@@ -464,6 +504,9 @@ EXPLAIN ANALYZE:
 | Planning Time: 1.160 ms 	|  	|
 | Execution Time: 4816.004 ms 	|  	|
 
+Plán našej query je dlhší o 3 riadky, to je hlavne kvôli tomu, že na začiatku vykonáva operácia Sort. Po tejto operácií sú operacie totožné. Riadky po operáciu HashAggregate (vrátane) majú menší cost pre orm vygenerovanú query, ale rozdiely sú minimálne. Ostatné riadky od tohto bodu sú totožné. Rows sú rovnaké pre všetky totožné operácie. Rýchlosti operácií sú približne rovnaké. Plánovanie zabralo približne rovnaký čas. Vykonávanie tiež približne rovnaké, ale vykonávanie v4 je rýchlejšie o ~30 ms.
+
+Query sú teda približne rovnaké až na použitie WITH a plány sa hlavne líšia v prvom kroku, kde bola pre náš dopyt použitá operácia SORT.
 
 ### /v3/statistics/tower_kills/
 ```sql
@@ -512,6 +555,9 @@ FROM (
 GROUP BY anon_1.hero_id, anon_1.localized_name
 ORDER BY sequence DESC, anon_1.localized_name ASC
 ```
+
+Obidve query používajú 4 query z toho sú 3 subquery. Najhlbšia query je v našom dopyte používaná pomocou WITH.  Tam kde sme použili LEFT JOIN je vo väčšine premenený na JOIN až na LEFT JOIN s matches_players_details, kde generovaná použila LEFT OUTER JOIN. My v našom WITH selecte zoraďujeme podľa match_id a času, čo je nadbytočné.
+
 EXPLAIN ANALYZE: 
 
 | v3 | v4 |
@@ -569,5 +615,9 @@ EXPLAIN ANALYZE:
 |                                                                                         ->  Seq Scan on heroes  (cost=0.00..2.13 rows=113 width=14) (actual   time=0.028..1.201 rows=113 loops=4) |  |
 | Planning Time: 1.206 ms |  |
 | Execution Time: 112862.472 ms |  |
+
+Najväčším rozdielom je počet riadkov, ktoré sa plánujú. Naše query má o 13 riadkov viac. Napriek väčšiemu počtu riadkov sa naša query vykonáva 10 000 ms rýchlejšie a plánovanie je približne rovnaké. Pre všetky, až na posledné riadky je cost menší pre v4 ako pre v3. U nás HashAggregate má hodnoty (cost=167326.87..169471.54 rows=214467 width=22) (actual time=112854.173..112856.146 rows=110 loops=1) a generovaný (cost=136631.17..138847.32 rows=221615 width=22) (actual time=122076.693..122079.619 rows=110 loops=1). Následným rozdielom je poradie operácií po HashAggregate, kde sa v našej najprv robí sort a potom WindowAgg a v generovanej sú naopak. Ďalším rozdielom je, že pre našu query boli nastavené workery a JOIN FILTER (time < duration) v našej query filtrovalo iba 2 riadky a vo v4 vyfiltrovalo 9 riadkov.
+
+Celkovo je naša query rýchlejšia, aj keď to z počtu riadkov nie je vidieť ako aj z cost hodnôt. Narozdiel od generovaného, sme použili aj WITH.
 
 
