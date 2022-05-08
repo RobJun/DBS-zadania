@@ -7,7 +7,7 @@ class Router:
         return 'primary'
 
     def db_for_write(self, model, **hints):
-        return False
+        return 'primary'
 
     def allow_relation(self, obj1, obj2, **hints):
         return True
