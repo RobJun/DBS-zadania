@@ -72,7 +72,7 @@ Náš:
 
 ORM:
 
-![patches_orm.png](Z:\6_semester\DBS\docs\patches_orm.png)
+![patches_orm.png](./docs/patches_orm.png "Patches_orm")
 
 ### v2/players/{id}/game_exp/
 
