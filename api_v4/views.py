@@ -35,7 +35,7 @@ def getPatches(req):
                     cast(extract('EPOCH',sa.Patches.release_date),Integer).label('release_date'),
                     func.lead(
                           cast(extract('EPOCH',
-                              sa.Patches.release_date),Integer),1).over(order_by='id').label('end_date')
+                              sa.Patches.release_date),Integer),1).over(order_by='name').label('end_date')
                      ).subquery()
      fin = select(patches,matches.c.id,matches.c.duration_minutes).join(matches,
           and_(matches.c.start_time >= patches.c.release_date,  matches.c.start_time <= patches.c.end_date),
